@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Banana Clicker</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+
+        #bananas {
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 18px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>Banana Clicker</h1>
+    <p>Click the banana to collect more bananas!</p>
+    <p>Bananas: <span id="bananas">0</span></p>
+    <button onclick="clickBanana()">Click Banana</button>
+    <script>
+        var bananas = 0;
+
+        function clickBanana() {
+            bananas++;
+            document.getElementById("bananas").textContent = bananas;
+        }
+
+        // Function to automatically generate bananas every second
+        setInterval(function() {
+            bananas += 1;
+            document.getElementById("bananas").textContent = bananas;
+        }, 1000);
+    </script>
+</body>
+</html>
