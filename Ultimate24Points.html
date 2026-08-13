@@ -1310,6 +1310,7 @@
   let nums = [];
   let ops = [];
   let numSeq = 0;
+  let opSeq = 0;
   let won = false;
   let poolCounts = { '+': 0, '-': 0, '*': 0, '/': 0, '^': 0 };
 
@@ -1359,6 +1360,7 @@
     nums = [];
     ops = [];
     numSeq = 0;
+    opSeq = 0;
     won = false;
     const mb = moveBounds();
     const numY = mb.top + Math.round((mb.bottom - mb.top) * 0.24);
@@ -1461,7 +1463,7 @@
     const total = used + poolCounts[sym];
     const x = ((mb.left + mb.right) / 2) + (used - (total - 1) / 2) * 90;
     poolCounts[sym]--;
-    const o = { id: 'o' + ops.length, sym, x, y, expanded: true, a: null, b: null, resultId: null };
+    const o = { id: 'o' + (opSeq++), sym, x, y, expanded: true, a: null, b: null, resultId: null };
     ops.push(o);
     renderDock();
     renderAll();
@@ -1487,7 +1489,7 @@
     const x = cx - ar.left;
     const y = cy - ar.top;
     poolCounts[sym]--;
-    const o = { id: 'o' + ops.length, sym, x, y, expanded: true, a: null, b: null, resultId: null };
+    const o = { id: 'o' + (opSeq++), sym, x, y, expanded: true, a: null, b: null, resultId: null };
     ops.push(o);
     updateDockBadge(sym);
     const el = opEl(o);
