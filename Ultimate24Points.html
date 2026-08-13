@@ -152,6 +152,7 @@
     flex-direction: column;
     align-items: flex-start;
   }
+  .mode-menu.hidden { display: none; }
   .mode-trigger {
     display: flex;
     align-items: center;
@@ -226,6 +227,7 @@
   .result-overlay.ok { color: #28a745; }
   .result-overlay.err { color: #dc3545; }
   .result-overlay.info { color: #6c757d; }
+  .result-overlay.hidden { display: none; }
 
   /* ===== 底部白框：浮在底部，宽度贴合内容 ===== */
   .bottom-bar {
@@ -591,6 +593,7 @@
   }
   .win-emoji { font-size: 52px; }
   .win-title { font-size: 30px; font-weight: bold; color: #2e7d32; margin-top: 8px; }
+  .ans-modal .win-title { color: #4a3f8f; }
   .win-sub { font-size: 15px; color: #666; margin-top: 8px; line-height: 1.5; }
   .win-btn {
     width: 100%;
@@ -708,25 +711,25 @@
 </head>
 <body>
   <div class="center">
-    <div class="mode-menu" id="modeMenu">
-      <div class="mode-trigger" id="modeTrigger">
-        <span class="mode-label" id="modeLabel">🔥 地狱模式</span>
-        <span class="mode-arrow" id="modeArrow">》</span>
+    <div class="mode-menu" id="ruleMenu">
+      <div class="mode-trigger" id="ruleTrigger">
+        <span class="mode-label" id="ruleLabel">🔥 地狱模式</span>
+        <span class="mode-arrow" id="ruleArrow">》</span>
       </div>
-      <div class="mode-panel" id="modePanel">
-        <div class="mode-opt active" data-mode="hell" id="modeHell">
+      <div class="mode-panel" id="rulePanel">
+        <div class="mode-opt active" data-rule="hell" id="ruleHell">
           <div class="mode-opt-name">🔥 地狱模式</div>
           <div class="mode-opt-desc">运算符数量随机 · 包含次方 ^ · 目标 6/24/36/48 随机</div>
         </div>
-        <div class="mode-opt" data-mode="hard" id="modeHard">
+        <div class="mode-opt" data-rule="hard" id="ruleHard">
           <div class="mode-opt-name">😈 困难模式</div>
           <div class="mode-opt-desc">运算符数量随机 · 包含次方 ^ · 目标固定为 24</div>
         </div>
-        <div class="mode-opt" data-mode="normal" id="modeNormal">
+        <div class="mode-opt" data-rule="normal" id="ruleNormal">
           <div class="mode-opt-name">🙂 普通模式</div>
           <div class="mode-opt-desc">+ - × ÷ 各 3 个 · 无次方 ^ · 目标 6/24/36/48 随机</div>
         </div>
-        <div class="mode-opt" data-mode="easy" id="modeEasy">
+        <div class="mode-opt" data-rule="easy" id="ruleEasy">
           <div class="mode-opt-name">😇 简单模式</div>
           <div class="mode-opt-desc">+ - × ÷ 各 3 个 · 无次方 ^ · 目标固定为 24</div>
         </div>
@@ -749,7 +752,7 @@
       <div class="btn-row">
         <button class="btn btn-danger" id="newBtn">下一题</button>
         <button class="btn btn-danger" id="retryBtn">重试</button>
-        <button class="btn btn-secondary" id="hintBtn">提示</button>
+        <button class="btn btn-secondary" id="hintBtn">显示答案</button>
       </div>
       <div class="score" id="scoreBar">✅ 已解答 <span id="solved">0</span> 题 &nbsp;|&nbsp; 🔍 已用提示 <span id="hinted">0</span> 次</div>
     </div>
@@ -774,6 +777,15 @@
         <div class="win-title" id="winTitle">成功！</div>
         <div class="win-sub" id="winSub"></div>
         <button class="btn btn-danger win-btn" id="winNextBtn">下一题</button>
+      </div>
+    </div>
+
+    <div class="win-modal ans-modal" id="ansModal">
+      <div class="win-card">
+        <div class="win-emoji">💡</div>
+        <div class="win-title ans-title" id="ansTitle">参考答案</div>
+        <div class="win-sub" id="ansSub"></div>
+        <button class="btn btn-danger win-btn" id="ansNextBtn">下一题</button>
       </div>
     </div>
 
@@ -808,7 +820,7 @@
   let currentOps = [];
   let solved = 0;
   let hinted = 0;
-  let gameMode = 'hell';
+  let gameRule = 'hell';
   let practiceLevel = null;
 
   const resultDiv = document.getElementById('result');
@@ -825,16 +837,17 @@
 
   const I18N = {
     zh: {
-      mode_easy: '😇 简单模式',
-      mode_normal: '🙂 普通模式',
-      mode_hard: '😈 困难模式',
-      mode_hell: '🔥 地狱模式',
+      rule_easy: '😇 正常24点',
+      rule_normal: '🙂 正常...多少点？',
+      rule_hard: '😈 复杂24点',
+      rule_hell: '🔥 终极24点!!',
       lvl_rookie: '🐣 入门',
       lvl_easy: '🙂 简单',
       lvl_medium: '😐 中等',
       lvl_hard: '😈 困难',
-      lvl_hell: '🔥 地狱',
-      lvl_hardest: '💀 最难',
+      lvl_hell: '🔥 极难',
+      lvl_hardest: '💀 地狱',
+      lvl_random: '🎲 随机',
       lvlTitle: '练习难度',
       desc_easy: '+ - × ÷ 各 3 个 · 无次方 ^ · 目标固定为 24',
       desc_normal: '+ - × ÷ 各 3 个 · 无次方 ^ · 目标 6/24/36/48 随机',
@@ -842,8 +855,9 @@
       desc_hell: '运算符数量随机 · 包含次方 ^ · 目标 6/24/36/48 随机',
       new: '下一题',
       retry: '重试',
-      hint: '提示',
-      score: (s, h) => '✅ 已解答 ' + s + ' 题  &nbsp;|&nbsp;  🔍 已用提示 ' + h + ' 次',
+      hint: '显示答案',
+      score: (s, h) => '✅ 已解答 ' + s + ' 题  &nbsp;|&nbsp;  💡 已显示答案 ' + h + ' 次',
+      ansTitle: '参考答案',
       homeTitle: '主界面',
       langTitle: '语言',
       setTitle: '设置',
@@ -866,26 +880,27 @@
       resultUndo: '↩️ 已撤销合成',
       resultReturn: (sym) => '↩️ 已将 ' + sym + ' 放回',
       resultWin: (target) => '🎉 成功！你算出 ' + target + ' 了！',
-      hintSol: (sol) => '💡 参考解法：' + sol,
       hintNoSol: '😢 这组牌无解，换一组吧',
       diffNoSol: '😢 无解，换一组吧',
+      diffLocked: '🔒 随机模式：不限难度，不显示解法与难度',
       diffCountTitle: '已去除 5×7 与 7×5、a+(b+c) 与 (a+b)+c 等对称重复的写法',
       diffScoreTitle: '难度 = −log₃(Σ 1/3^单解难度)；唯一解取其难度，解法越多、越简单难度越低',
-      diffLabels: { c2: '非常简单', c3: '简单', c5: '中等', c7: '较难', c8: '困难', c10: '极难' },
+      diffLabels: { c2: '入门', c4: '简单', c6: '中等', c8: '困难', c10: '极难', c12: '地狱' },
       diffCount: (n) => '🧩 解法 ' + n + ' 种',
-      diffScore: (d, l) => '🎯 难度 ' + d + '/10 · ' + l
+      diffScore: (d, l) => '🎯 难度 ' + d + ' · ' + l
     },
     en: {
-      mode_easy: '😇 Easy',
-      mode_normal: '🙂 Normal',
-      mode_hard: '😈 Hard',
-      mode_hell: '🔥 Hell',
+      rule_easy: '😇 Classic 24',
+      rule_normal: '🙂 Classic ...?',
+      rule_hard: '😈 Complex 24',
+      rule_hell: '🔥 Ultimate 24!!',
       lvl_rookie: '🐣 Rookie',
       lvl_easy: '🙂 Easy',
       lvl_medium: '😐 Medium',
       lvl_hard: '😈 Hard',
-      lvl_hell: '🔥 Hell',
-      lvl_hardest: '💀 Hardest',
+      lvl_hell: '🔥 Extreme',
+      lvl_hardest: '💀 Hell',
+      lvl_random: '🎲 Random',
       lvlTitle: 'Practice level',
       desc_easy: '+ - × ÷ ×3 each · no ^ · target fixed 24',
       desc_normal: '+ - × ÷ ×3 each · no ^ · target 6/24/36/48 random',
@@ -893,8 +908,9 @@
       desc_hell: 'Random ops · includes ^ · target 6/24/36/48 random',
       new: 'Next',
       retry: 'Retry',
-      hint: 'Hint',
-      score: (s, h) => '✅ Solved ' + s + ' &nbsp;|&nbsp;  🔍 Hints used ' + h,
+      hint: 'Show Answer',
+      score: (s, h) => '✅ Solved ' + s + ' &nbsp;|&nbsp;  💡 Answers shown ' + h,
+      ansTitle: 'Reference Answer',
       homeTitle: 'Home',
       langTitle: 'Language',
       setTitle: 'Settings',
@@ -917,14 +933,14 @@
       resultUndo: '↩️ Undo compose',
       resultReturn: (sym) => '↩️ Returned ' + sym,
       resultWin: (target) => '🎉 You made ' + target + '!',
-      hintSol: (sol) => '💡 Solution: ' + sol,
       hintNoSol: '😢 No solution, try another set',
       diffNoSol: '😢 No solution, try another set',
+      diffLocked: '🔒 Random mode: no difficulty limit, solution & difficulty hidden',
       diffCountTitle: 'Deduplicated symmetric expressions like 5×7 vs 7×5, a+(b+c) vs (a+b)+c',
       diffScoreTitle: 'Difficulty = −log₃(Σ 1/3^per-solution difficulty); more solutions & easier ones → lower difficulty',
-      diffLabels: { c2: 'Very easy', c3: 'Easy', c5: 'Medium', c7: 'Hard', c8: 'Very hard', c10: 'Extreme' },
+      diffLabels: { c2: 'Rookie', c4: 'Easy', c6: 'Medium', c8: 'Hard', c10: 'Extreme', c12: 'Hell' },
       diffCount: (n) => '🧩 ' + n + ' solutions',
-      diffScore: (d, l) => '🎯 Difficulty ' + d + '/10 · ' + l
+      diffScore: (d, l) => '🎯 Difficulty ' + d + ' · ' + l
     }
   };
 
@@ -1143,14 +1159,22 @@
 
   // ===== 练习模式难度控制 =====
   const LEVEL_CFG = {
-    rookie:  { band: [1, 2.5], cardMax: 10, counts: { '+': 3, '-': 3, '*': 3, '/': 0, '^': 0 }, targets: [24] },
-    easy:    { band: [2.5, 4], cardMax: 13, counts: { '+': 3, '-': 3, '*': 3, '/': 3, '^': 0 }, targets: [24] },
+    rookie:  { band: [0, 2],   cardMax: 10, counts: { '+': 3, '-': 3, '*': 3, '/': 0, '^': 0 }, targets: [24] },
+    easy:    { band: [2, 4],   cardMax: 13, counts: { '+': 3, '-': 3, '*': 3, '/': 3, '^': 0 }, targets: [24] },
     medium:  { band: [4, 6],   cardMax: 13, counts: { '+': 3, '-': 3, '*': 3, '/': 3, '^': 0 }, targets: [24, 36] },
     hard:    { band: [6, 8],   cardMax: 13, counts: { '+': 3, '-': 3, '*': 3, '/': 3, '^': 1 }, targets: [24, 36, 48] },
     hell:    { band: [8, 10],  cardMax: 13, counts: { '+': 3, '-': 3, '*': 3, '/': 3, '^': 1 }, targets: [6, 24, 36, 48] },
-    hardest: { band: [9, 10],  strictLow: 9, cardMax: 13, counts: { '+': 3, '-': 3, '*': 3, '/': 3, '^': 1 }, targets: [6, 24, 36, 48] }
+    hardest: { band: [10, Infinity], cardMax: 13, counts: { '+': 3, '-': 3, '*': 3, '/': 3, '^': 1 }, targets: [6, 24, 36, 48] }
   };
   const LEVEL_ORDER = ['rookie', 'easy', 'medium', 'hard', 'hell', 'hardest'];
+
+  // 固定运算符池规则（简单/普通规则）的练习档位：运算符个数给定 → 不删运算符，reject sampling；
+  // 为保证效率放大难度区间：简单 [0,3)、困难 [3,∞)
+  const LEVEL_CFG_FIXED = {
+    easy: { band: [0, 3], cardMax: 13, counts: { '+': 3, '-': 3, '*': 3, '/': 3, '^': 0 }, targets: [24] },
+    hard: { band: [3, Infinity], cardMax: 13, counts: { '+': 3, '-': 3, '*': 3, '/': 3, '^': 0 }, targets: [6, 24, 36, 48] }
+  };
+  const LEVEL_ORDER_FIXED = ['easy', 'hard'];
   const POOL_OPS = ['+', '-', '*', '/', '^'];
 
   function aggregateScore(sols) {
@@ -1158,7 +1182,15 @@
     let ans = 0;
     sols.forEach((s) => { ans += 1 / Math.pow(3, s.score); });
     let agg = Math.max(0, -Math.log(ans) / Math.log(3));
-    return Math.max(1, Math.min(10, agg));
+    return Math.max(0, agg);
+  }
+
+  function aggregateScores(scores) {
+    if (scores.length === 0) return null;
+    let ans = 0;
+    scores.forEach((sc) => { ans += 1 / Math.pow(3, sc); });
+    let agg = Math.max(0, -Math.log(ans) / Math.log(3));
+    return Math.max(0, agg);
   }
 
   function poolFromCounts(c) {
@@ -1171,46 +1203,94 @@
     return POOL_OPS.every((op) => s.usage[op] <= counts[op]);
   }
 
+  function usageKey(u) { return POOL_OPS.map((op) => u[op]).join(','); }
+
+  // 某解法（含多种等价写法 variants）在给定运算符池下的最低难度；无法表达则 null
+  function poolScore(s, counts) {
+    let best = null;
+    s.variants.forEach((sc, uk) => {
+      const parts = uk.split(',').map(Number);
+      if (parts.every((n, i) => n <= counts[POOL_OPS[i]])) {
+        if (best === null || sc < best) best = sc;
+      }
+    });
+    return best;
+  }
+
   function keyOf(c) { return POOL_OPS.map((op) => c[op]).join(','); }
 
-  // 核心：全池求解 → 若难度不足，BFS 递减运算符抬高难度；落在 [lo,hi] 内即用，
-  // 否则取离区间中值最近者兜底。strictLow>0 时难度必须严格大于该值。
+  function poolLabel(c) {
+    return POOL_OPS.map((op) => (c[op] > 0 ? op + '×' + c[op] : '')).filter(Boolean).join(' ') || '无运算符';
+  }
+
+  // 核心：全池求解 → 若难度不足，BFS 递减运算符抬高难度；落在半开区间 [lo,hi) 内即用，
+  // 否则取离区间中值最近者兜底。hi=Infinity 表示无上限（难度 ≥ lo 即可）。
   function generatePuzzleForLevel(levelKey) {
-    const cfg = LEVEL_CFG[levelKey];
-    const lo = cfg.band[0], hi = cfg.band[1], mid = (lo + hi) / 2;
-    const strict = cfg.strictLow > 0;
-    const maxAttempts = strict ? 500 : 120;
-    const inBand = (d) => strict ? (d > lo && d <= hi) : (d >= lo && d <= hi);
+    const fixed = useEasyOps();
+    const cfg = fixed ? LEVEL_CFG_FIXED[levelKey] : LEVEL_CFG[levelKey];
+    const lo = cfg.band[0], hi = cfg.band[1];
+    const openTop = hi === Infinity;
+    const mid = openTop ? lo : (lo + hi) / 2;
+    const maxAttempts = openTop ? 500 : 120;
+    const inBand = (d) => (d >= lo && d < hi);
+    console.group('🧩 练习难度生成 [' + levelKey + ']，目标难度带 [' + lo + ', ' + (openTop ? '∞' : hi) + ']' + (fixed ? '，固定运算符池（不删运算符，reject sampling）' : ''));
     let best = null;
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       const cards = Array.from({ length: 4 }, () => Math.floor(Math.random() * cfg.cardMax) + 1);
-      const target = cfg.targets[Math.floor(Math.random() * cfg.targets.length)];
+      const target = fixed
+        ? (useFixedTarget() ? 24 : [6, 24, 36, 48][Math.floor(Math.random() * 4)])
+        : cfg.targets[Math.floor(Math.random() * cfg.targets.length)];
       const full = cfg.counts;
       const sols = solveAll(cards, target, full);
       if (sols.length === 0) continue;
       const floor = aggregateScore(sols);
-      if (floor > hi) continue;
-      if (inBand(floor)) return { cards, target, ops: poolFromCounts(full) };
-      const r = searchPoolSubsets(cards, target, full, sols, lo, hi, mid, strict);
-      if (r.found) return { cards, target, ops: poolFromCounts(r.pool) };
+      if (floor >= hi) continue;
+      if (inBand(floor)) {
+        console.log('尝试 ' + (attempt + 1) + ' 次后收下');
+        console.groupEnd();
+        return { cards, target, ops: poolFromCounts(full) };
+      }
+      if (fixed) {
+        const err = Math.abs(floor - mid);
+        if (!best || err < best.err) best = { cards, target, pool: full, diff: floor, err };
+        continue;
+      }
+      const r = searchPoolSubsets(cards, target, full, sols, lo, hi, mid);
+      if (r.found) {
+        console.log('尝试 ' + (attempt + 1) + ' 次后收下（BFS 缩减运算符池）');
+        console.groupEnd();
+        return { cards, target, ops: poolFromCounts(r.pool) };
+      }
       if (r.best && inBand(r.best.diff) && (!best || r.best.err < best.err)) best = r.best;
     }
+    if (best) {
+      console.log('尝试耗尽（' + maxAttempts + ' 次），回退最接近' + (openTop ? '下界' : '中值') + '的池，难度 ' + best.diff.toFixed(2) + '（池：' + poolLabel(best.pool) + '）');
+    } else {
+      console.warn('尝试耗尽（' + maxAttempts + ' 次）且无任何合格池，生成失败（返回 null）');
+    }
+    console.groupEnd();
     return best ? { cards: best.cards, target: best.target, ops: poolFromCounts(best.pool) } : null;
   }
 
   // 从最宽松子集起 BFS 递减运算符（^ 优先），返回第一个落在区间内的池，否则记录最接近中值者
-  function searchPoolSubsets(cards, target, full, sols, lo, hi, mid, strict) {
+  function searchPoolSubsets(cards, target, full, sols, lo, hi, mid) {
     const start = Object.assign({}, full);
     const seen = new Set([keyOf(start)]);
     const queue = [start];
-    const inBand = (d) => strict ? (d > lo && d <= hi) : (d >= lo && d <= hi);
+    const inBand = (d) => (d >= lo && d < hi);
     let best = null;
     while (queue.length) {
       const cur = queue.shift();
-      const valid = sols.filter((s) => fitsPool(s, cur));
-      if (valid.length === 0) continue;
-      const d = aggregateScore(valid);
-      if (inBand(d)) return { found: true, pool: cur, diff: d };
+      const scores = [];
+      sols.forEach((s) => {
+        const sc = poolScore(s, cur);
+        if (sc !== null) scores.push(sc);
+      });
+      if (scores.length === 0) continue;
+      const d = aggregateScores(scores);
+      if (inBand(d)) {
+        return { found: true, pool: cur, diff: d };
+      }
       const err = Math.abs(d - mid);
       if (!best || err < best.err) best = { pool: cur, err, diff: d, cards, target };
       POOL_OPS.forEach((op) => {
@@ -1234,12 +1314,12 @@
   let poolCounts = { '+': 0, '-': 0, '*': 0, '/': 0, '^': 0 };
 
   // 运算符规则：easy/normal 用固定四则（无次方），hard/hell 用随机池（含次方）
-  function useEasyOps() { return gameMode === 'easy' || gameMode === 'normal'; }
+  function useEasyOps() { return gameRule === 'easy' || gameRule === 'normal'; }
   // 目标规则：easy/hard 固定 24，normal/hell 随机
-  function useFixedTarget() { return gameMode === 'easy' || gameMode === 'hard'; }
+  function useFixedTarget() { return gameRule === 'easy' || gameRule === 'hard'; }
 
   function newGame() {
-    if (practiceLevel) {
+    if (practiceLevel && practiceLevel !== 'random') {
       const p = generatePuzzleForLevel(practiceLevel);
       if (p) {
         currentCards = p.cards;
@@ -1265,12 +1345,14 @@
     resetBoard();
     showTarget();
     hideWinModal();
+    hideAnsModal();
   }
 
   function retryGame() {
     resetBoard();
     hideWinModal();
-    setResult(t('resultReset'), 'info');
+    hideAnsModal();
+    setResult('', 'info');
   }
 
   function resetBoard() {
@@ -2000,6 +2082,7 @@
   }
   function hideWinModal() {
     document.getElementById('winModal').classList.remove('show');
+    document.getElementById('ansModal').classList.remove('show');
   }
 
   // ===== 礼炮庆祝 =====
@@ -2046,7 +2129,7 @@
 
   function setResult(text, type) {
     resultDiv.textContent = text;
-    resultDiv.className = 'result-overlay ' + type;
+    resultDiv.className = 'result-overlay ' + type + (text ? '' : ' hidden');
   }
 
   // ===== 提示 =====
@@ -2081,15 +2164,19 @@
     return null;
   }
 
-  function showHint() {
+  function showAnswer() {
     const sol = findSolution(currentCards.map((n) => ({ expr: String(n), val: n })), currentTarget, opCountMap());
     if (sol) {
       hinted++;
       document.getElementById('hinted').textContent = hinted;
-      setResult(t('hintSol', sol), 'ok');
+      document.getElementById('ansSub').textContent = sol;
+      document.getElementById('ansModal').classList.add('show');
     } else {
       setResult(t('hintNoSol'), 'info');
     }
+  }
+  function hideAnsModal() {
+    document.getElementById('ansModal').classList.remove('show');
   }
 
   // ===== 难度评估 =====
@@ -2209,7 +2296,7 @@
         if (hardPow) score += 2;
         score += Math.max(0, nodeDepth(n) - 3);
       }
-      return Math.max(1, Math.min(10, score));
+      return Math.max(1, score);
     }
 
     function evaluateTree(vals) {
@@ -2234,12 +2321,27 @@
               const canon = canonical(root);
               const score = difficulty(root);
               const prev = seen.get(canon);
-              if (prev === undefined || score < prev.score) {
-                seen.set(canon, { canon, expr: treeExpr(root), node: root, score, usage: Object.assign({}, usage) });
-              } else {
-                ['+', '-', '*', '/', '^'].forEach((op) => {
-                  prev.usage[op] = Math.min(prev.usage[op], usage[op]);
+              if (prev === undefined) {
+                seen.set(canon, {
+                  canon,
+                  expr: treeExpr(root),
+                  node: root,
+                  score,
+                  usage: Object.assign({}, usage),
+                  usageKey: usageKey(usage),
+                  variants: new Map([[usageKey(usage), score]])
                 });
+              } else {
+                const uk = usageKey(usage);
+                const vmin = prev.variants.get(uk);
+                if (vmin === undefined || score < vmin) prev.variants.set(uk, score);
+                if (score < prev.score) {
+                  prev.score = score;
+                  prev.expr = treeExpr(root);
+                  prev.node = root;
+                  prev.usage = Object.assign({}, usage);
+                  prev.usageKey = uk;
+                }
               }
             }
           }
@@ -2267,72 +2369,82 @@
   }
 
   function difficultyLabel(score) {
-    if (score <= 2) return { text: t('diffLabels.c2'), color: '#28a745' };
-    if (score <= 3) return { text: t('diffLabels.c3'), color: '#4caf50' };
-    if (score <= 5) return { text: t('diffLabels.c5'), color: '#ff9800' };
-    if (score <= 7) return { text: t('diffLabels.c7'), color: '#f4511e' };
-    if (score <= 8) return { text: t('diffLabels.c8'), color: '#d32f2f' };
-    return { text: t('diffLabels.c10'), color: '#8e24aa' };
+    if (score < 2) return { text: t('diffLabels.c2'), color: '#28a745' };
+    if (score < 4) return { text: t('diffLabels.c4'), color: '#4caf50' };
+    if (score < 6) return { text: t('diffLabels.c6'), color: '#ff9800' };
+    if (score < 8) return { text: t('diffLabels.c8'), color: '#f4511e' };
+    if (score < 10) return { text: t('diffLabels.c10'), color: '#d32f2f' };
+    return { text: t('diffLabels.c12'), color: '#8e24aa' };
   }
 
   function showDifficulty() {
     const div = document.getElementById('diff');
-    const sols = solveAll(currentCards, currentTarget, opCountMap());
-    console.group('🎴 题目：' + currentCards.join(' ') + ' → ' + currentTarget + '，符号：' + currentOps.join(' '));
-    if (sols.length === 0) {
-      console.warn('no solution');
+    const randomMode = practiceLevel === 'random';
+    try {
+      const sols = solveAll(currentCards, currentTarget, opCountMap());
+      console.group('🎴 题目：' + currentCards.join(' ') + ' → ' + currentTarget + '，符号：' + currentOps.join(' '));
+      if (sols.length === 0) {
+        console.warn('no solution');
+        console.groupEnd();
+        div.innerHTML = '<span class="diff-badge" style="background:#9e9e9e">' + t('diffNoSol') + '</span>';
+        return;
+      }
+      const sorted = sols.slice().sort((x, y) => x.score - y.score);
+      let ans = 0;
+      sols.forEach((s) => { ans += 1 / Math.pow(3, s.score); });
+      let agg = Math.max(0, -Math.log(ans) / Math.log(3));
+      agg = Math.max(0, agg);
+      const best = Math.round(agg * 10) / 10;
+      const label = difficultyLabel(best);
+      sorted.forEach((s, i) => {
+        console.log(`解法 ${i + 1}：${s.expr}  难度 ${s.score}`);
+      });
+      console.info(
+        `共 ${sols.length} 种解法，聚合难度 ${best}（${label.text}）`
+      );
       console.groupEnd();
-      div.innerHTML = '<span class="diff-badge" style="background:#9e9e9e">' + t('diffNoSol') + '</span>';
-      return;
+      if (randomMode) {
+        div.innerHTML = '<span class="diff-badge" style="background:#3d3d3d" title="' + t('diffLocked') + '">🔒</span>';
+        return;
+      }
+      div.innerHTML =
+        '<span class="diff-badge" style="background:#4a3f8f" title="' + t('diffCountTitle') + '">' +
+        t('diffCount', sols.length) + '</span>' +
+        '<span class="diff-badge" style="background:' + label.color + '" title="' + t('diffScoreTitle') + '">' +
+        t('diffScore', best, label.text) + '</span>';
+    } catch (e) {
+      console.error('showDifficulty error:', e);
+      div.innerHTML = '<span class="diff-badge" style="background:#9e9e9e">难度计算错误</span>';
     }
-    const sorted = sols.slice().sort((x, y) => x.score - y.score);
-    // 聚合打分：每个解法难度 n 贡献 1/3^n，难度 = −log_3(Σ)
-    // 唯一解取其自身难度（如 2+1+12+9 → 3，1 5 5 5 → 10）；
-    // 解法越多、越简单 → Σ 越大 → 难度越低，且满足偏序性质。
-    let ans = 0;
-    sols.forEach((s) => { ans += 1 / Math.pow(3, s.score); });
-    let agg = Math.max(0, -Math.log(ans) / Math.log(3));
-    agg = Math.max(1, Math.min(10, agg));
-    const best = Math.round(agg * 10) / 10;
-    const label = difficultyLabel(best);
-    sorted.forEach((s, i) => {
-      console.log(`解法 ${i + 1}：${s.expr}  难度 ${s.score}/10`);
-    });
-    console.info(
-      `共 ${sols.length} 种解法，聚合难度 ${best}/10（${label.text}）`
-    );
-    console.groupEnd();
-    div.innerHTML =
-      '<span class="diff-badge" style="background:#4a3f8f" title="' + t('diffCountTitle') + '">' +
-      t('diffCount', sols.length) + '</span>' +
-      '<span class="diff-badge" style="background:' + label.color + '" title="' + t('diffScoreTitle') + '">' +
-      t('diffScore', best, label.text) + '</span>';
   }
 
   document.getElementById('newBtn').addEventListener('click', newGame);
   document.getElementById('retryBtn').addEventListener('click', retryGame);
-  document.getElementById('hintBtn').addEventListener('click', showHint);
+  document.getElementById('hintBtn').addEventListener('click', showAnswer);
   document.getElementById('winNextBtn').addEventListener('click', newGame);
+  document.getElementById('ansNextBtn').addEventListener('click', () => {
+    hideAnsModal();
+    newGame();
+  });
 
   // ===== 模式菜单 =====
-  const MODE_KEYS = ['easy', 'normal', 'hard', 'hell'];
-  const modeMenu = document.getElementById('modeMenu');
-  const modeLabel = document.getElementById('modeLabel');
-  const modeHell = document.getElementById('modeHell');
-  const modeHard = document.getElementById('modeHard');
-  const modeNormal = document.getElementById('modeNormal');
-  const modeEasy = document.getElementById('modeEasy');
+const RULE_KEYS = ['easy', 'normal', 'hard', 'hell'];
+  const ruleMenu = document.getElementById('ruleMenu');
+  const ruleLabel = document.getElementById('ruleLabel');
+  const ruleHell = document.getElementById('ruleHell');
+  const ruleHard = document.getElementById('ruleHard');
+  const ruleNormal = document.getElementById('ruleNormal');
+  const ruleEasy = document.getElementById('ruleEasy');
 
-  function setMode(mode) {
-    gameMode = mode;
-    practiceLevel = null;
+  function setRule(rule) {
+    gameRule = rule;
     renderLevelBar();
-    modeLabel.textContent = t('mode_' + mode);
-    modeHell.classList.toggle('active', mode === 'hell');
-    modeHard.classList.toggle('active', mode === 'hard');
-    modeNormal.classList.toggle('active', mode === 'normal');
-    modeEasy.classList.toggle('active', mode === 'easy');
-    modeMenu.classList.remove('open');
+    ruleLabel.textContent = t('rule_' + rule);
+    ruleHell.classList.toggle('active', rule === 'hell');
+    ruleHard.classList.toggle('active', rule === 'hard');
+    ruleNormal.classList.toggle('active', rule === 'normal');
+    ruleEasy.classList.toggle('active', rule === 'easy');
+    ruleMenu.classList.remove('open');
     newGame();
   }
 
@@ -2343,8 +2455,10 @@
       bar.classList.remove('show');
       return;
     }
+    const order = useEasyOps() ? LEVEL_ORDER_FIXED : LEVEL_ORDER;
+    if (practiceLevel !== 'random' && order.indexOf(practiceLevel) === -1) practiceLevel = order[0];
     bar.classList.add('show');
-    LEVEL_ORDER.forEach((k) => {
+    order.forEach((k) => {
       const btn = document.createElement('button');
       btn.className = 'level-pill' + (k === practiceLevel ? ' active' : '');
       btn.textContent = t('lvl_' + k);
@@ -2355,15 +2469,24 @@
       });
       bar.appendChild(btn);
     });
+    const rnd = document.createElement('button');
+    rnd.className = 'level-pill' + (practiceLevel === 'random' ? ' active' : '');
+    rnd.textContent = t('lvl_random');
+    rnd.addEventListener('click', () => {
+      practiceLevel = 'random';
+      renderLevelBar();
+      newGame();
+    });
+    bar.appendChild(rnd);
   }
 
-  document.getElementById('modeTrigger').addEventListener('click', () => {
-    modeMenu.classList.toggle('open');
+  document.getElementById('ruleTrigger').addEventListener('click', () => {
+    ruleMenu.classList.toggle('open');
   });
-  modeHell.addEventListener('click', () => setMode('hell'));
-  modeHard.addEventListener('click', () => setMode('hard'));
-  modeNormal.addEventListener('click', () => setMode('normal'));
-  modeEasy.addEventListener('click', () => setMode('easy'));
+  ruleHell.addEventListener('click', () => setRule('hell'));
+  ruleHard.addEventListener('click', () => setRule('hard'));
+  ruleNormal.addEventListener('click', () => setRule('normal'));
+  ruleEasy.addEventListener('click', () => setRule('easy'));
 
   // ===== 新手引导：首次进入展示 3 步 =====
   const TUTORIAL_STEPS = [
@@ -2437,6 +2560,8 @@
     document.getElementById('retryBtn').textContent = t('retry');
     document.getElementById('hintBtn').textContent = t('hint');
     document.getElementById('winNextBtn').textContent = t('new');
+    document.getElementById('ansNextBtn').textContent = t('new');
+    document.getElementById('ansTitle').textContent = t('ansTitle');
     document.getElementById('scoreBar').innerHTML =
       t('score', '<span id="solved">' + solved + '</span>', '<span id="hinted">' + hinted + '</span>');
     document.getElementById('homeBtn').title = t('homeTitle');
@@ -2447,11 +2572,11 @@
     document.getElementById('homeTitle').textContent = t('homeTitle');
     document.getElementById('startBtn').textContent = t('btnStart');
     document.getElementById('practiceBtn').textContent = t('btnPractice');
-    document.getElementById('modeLabel').textContent = t('mode_' + gameMode);
+    document.getElementById('ruleLabel').textContent = t('rule_' + gameRule);
     [['easy', '😇'], ['normal', '🙂'], ['hard', '😈'], ['hell', '🔥']].forEach(([mode, emoji]) => {
-      const el = document.getElementById('mode' + mode[0].toUpperCase() + mode.slice(1));
+      const el = document.getElementById('rule' + mode[0].toUpperCase() + mode.slice(1));
       if (el) {
-        el.querySelector('.mode-opt-name').textContent = t('mode_' + mode);
+        el.querySelector('.mode-opt-name').textContent = t('rule_' + mode);
         el.querySelector('.mode-opt-desc').textContent = t('desc_' + mode);
       }
     });
@@ -2489,21 +2614,37 @@
 
   // ===== 主界面 =====
   const homeScreen = document.getElementById('homeScreen');
+  const ruleMenuEl = document.getElementById('ruleMenu');
+  const levelBarEl = document.getElementById('levelBar');
   function showHome() {
     homeScreen.classList.add('show');
   }
   function hideHome() {
     homeScreen.classList.remove('show');
   }
-  document.getElementById('startBtn').addEventListener('click', () => {});
-  document.getElementById('practiceBtn').addEventListener('click', () => {
+  function startCasual() {
+    gameRule = 'hell';
+    practiceLevel = 'random';
+    ruleMenuEl.classList.add('hidden');
+    levelBarEl.classList.remove('show');
+    levelBarEl.innerHTML = '';
     hideHome();
-    practiceLevel = practiceLevel || 'rookie';
+    newGame();
+    startTutorial();
+  }
+  document.getElementById('startBtn').addEventListener('click', startCasual);
+  document.getElementById('practiceBtn').addEventListener('click', () => {
+    ruleMenuEl.classList.remove('hidden');
+    practiceLevel = practiceLevel || (useEasyOps() ? LEVEL_ORDER_FIXED[0] : LEVEL_ORDER[0]);
     renderLevelBar();
+    hideHome();
     newGame();
     startTutorial();
   });
-  document.getElementById('homeBtn').addEventListener('click', showHome);
+  document.getElementById('homeBtn').addEventListener('click', () => {
+    ruleMenuEl.classList.remove('hidden');
+    showHome();
+  });
 
   newGame();
   applyLang();
