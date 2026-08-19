@@ -707,88 +707,6 @@
     box-shadow: 0 3px 10px rgba(247, 151, 30, 0.4);
   }
   .tut-btn-skip { background: #eee; color: #888; }
-
-  /* ===== 手机适配 ===== */
-  @media (max-width: 600px) {
-    .home-title {
-      font-size: 36px;
-      margin-bottom: 32px;
-    }
-    .home-btn {
-      width: 150px;
-      padding: 13px 0;
-      font-size: 16px;
-    }
-    .cards { gap: 6px; }
-    .card {
-      width: 36px;
-      height: 50px;
-      font-size: 22px;
-      border-radius: 10px;
-    }
-    .target-badge .t-num {
-      font-size: 30px;
-      min-width: 64px;
-      padding: 5px 16px;
-    }
-    .target-badge .t-label { font-size: 11px; }
-    .top-bar { padding: 6px 12px 8px; }
-
-    .num {
-      min-width: 52px;
-      height: 52px;
-      font-size: 24px;
-      padding: 0 8px;
-      border-radius: 10px;
-    }
-    .num.fraction { font-size: 18px; }
-    .op { min-width: 76px; padding: 8px; gap: 4px; }
-    .op.collapsed { min-width: 52px; width: 52px; height: 52px; }
-    .op.collapsed .op-symbol { font-size: 22px; }
-    .op-symbol { font-size: 24px; }
-    .power-symbol { font-size: 18px; }
-    .power-symbol .p-exp { font-size: 11px; }
-    .op-slots { gap: 4px; }
-    .slot { width: 38px; height: 36px; }
-    .slot .ghost { font-size: 15px; }
-    .slot .num.in-slot { width: 36px; min-width: 36px; height: 32px; font-size: 16px; }
-    .op-slots.power-slots { height: 56px; }
-    .power-slots .slot.sup-slot { width: 34px; height: 28px; }
-    .power-slots .slot.sup-slot .num.in-slot { width: 30px; min-width: 30px; height: 24px; font-size: 13px; }
-
-    .op-dock { gap: 10px; padding: 10px; }
-    .op-fixed { width: 52px; height: 52px; }
-    .op-fixed .op-symbol { font-size: 22px; }
-    .op-fixed .power-symbol { font-size: 18px; }
-    .op-fixed .power-symbol .p-exp { font-size: 11px; }
-    .op-fixed .count-badge { min-width: 18px; height: 18px; font-size: 11px; top: -5px; right: -5px; }
-
-    .btn { padding: 7px 14px; font-size: 13px; min-width: 76px; border-radius: 8px; }
-    .score { font-size: 11px; margin-top: 5px; }
-    .bottom-bar { padding: 8px 12px 10px; }
-    .btn-row { gap: 7px; }
-
-    .corner-btn { width: 44px; height: 44px; font-size: 18px; border-radius: 10px; }
-    .corner-btn .lang-icon { font-size: 13px; }
-
-    .mode-panel { width: 220px; }
-    .mode-opt { padding: 8px 10px; }
-    .mode-opt-name { font-size: 13px; }
-    .mode-opt-desc { font-size: 10px; }
-
-    .level-pill { padding: 4px 8px; font-size: 11px; }
-
-    .win-card { padding: 22px 18px 18px; }
-    .win-emoji { font-size: 40px; }
-    .win-title { font-size: 24px; }
-    .win-sub { font-size: 13px; }
-    .win-btn { padding: 10px 0; font-size: 14px; }
-
-    .tut-card { width: 260px; padding: 14px 16px; }
-    .tut-emoji { font-size: 32px; }
-    .tut-title { font-size: 17px; }
-    .tut-text { font-size: 13px; }
-  }
 </style>
 </head>
 <body>
@@ -898,6 +816,21 @@
 
 <script>
   function slabSize() { const el = document.querySelector('.num'); return el ? el.offsetHeight : 64; }
+
+  // 手机/小屏适配：整页按同一比例缩放（保持桌面版比例，避免元素被 UI 遮挡）。
+  // 设计基准尺寸：游戏按此宽度/高度布局，再等比缩放到实际屏幕。
+  // 手机竖屏时宽度限制缩放；横屏/平板按 min 约束；桌面窗口不放大（zoom 上限 1）。
+  const DESIGN_W = 600, DESIGN_H = 600;
+  let curZoom = 1;
+  function fitZoom() {
+    const physW = window.innerWidth * curZoom;
+    const physH = window.innerHeight * curZoom;
+    curZoom = Math.min(1, physW / DESIGN_W, physH / DESIGN_H);
+    document.documentElement.style.zoom = curZoom;
+  }
+  window.addEventListener('resize', fitZoom);
+  window.addEventListener('orientationchange', fitZoom);
+  fitZoom();
 
   let currentCards = [];
   let currentTarget = 24;
