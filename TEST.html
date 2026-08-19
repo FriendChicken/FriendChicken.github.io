@@ -10,7 +10,6 @@
   body {
     font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    height: 100vh;
     overflow: hidden;
     display: flex;
     touch-action: none;
@@ -303,7 +302,7 @@
   .home-screen {
     position: absolute;
     inset: 0;
-    z-index: 730;
+    z-index: 750;
     display: none;
     flex-direction: column;
     align-items: center;
@@ -481,17 +480,16 @@
   /* ===== 固定运算符滑块（点击生成）===== */
   .op-dock {
     position: absolute;
-    left: 50%;
-    top: 80%;
-    transform: translate(-50%, -50%);
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
     display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    max-width: min(560px, calc(100% - 24px));
-    gap: 14px;
-    padding: 14px;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
     border: 2px solid rgba(255, 255, 255, 0.35);
-    border-radius: 22px;
+    border-radius: 18px;
     background: rgba(255, 255, 255, 0.10);
     z-index: 20;
     pointer-events: none;
@@ -818,19 +816,53 @@
   function slabSize() { const el = document.querySelector('.num'); return el ? el.offsetHeight : 64; }
 
   // 手机/小屏适配：整页按同一比例缩放（保持桌面版比例，避免元素被 UI 遮挡）。
-  // 设计基准尺寸：游戏按此宽度/高度布局，再等比缩放到实际屏幕。
-  // 手机竖屏时宽度限制缩放；横屏/平板按 min 约束；桌面窗口不放大（zoom 上限 1）。
-  const DESIGN_W = 600, DESIGN_H = 600;
+  // 设计基准：UI 按 DESIGN×DESIGN 的方形画布布局。实时取窗口物理长宽，
+  // c = 物理宽 / DESIGN，d = 物理高 / DESIGN，缩放比 = min(1, c, d)：
+  // 长或宽任一小于 DESIGN 就开始等比缩小；两者都 ≥ DESIGN 时保持 1:1，不放大。
+  // 关键：物理尺寸用 window.outerWidth/outerHeight（浏览器窗口真实大小，不随根元素
+  // zoom 变化），避免 window.innerWidth 在应用 zoom 后改变、从而在每次 resize 时把
+  // 缩放比越推越小（反馈循环）。
+  // 视觉/布局空间换算见下方 rectL / evX / evY 说明。
+  const DESIGN = 800;
   let curZoom = 1;
   function fitZoom() {
-    const physW = window.innerWidth * curZoom;
-    const physH = window.innerHeight * curZoom;
-    curZoom = Math.min(1, physW / DESIGN_W, physH / DESIGN_H);
+    const w = window.outerWidth || window.screen.width;
+    const h = window.outerHeight || window.screen.height;
+    curZoom = Math.min(1, w / DESIGN, h / DESIGN);
     document.documentElement.style.zoom = curZoom;
   }
+  // 根 zoom 会把视觉空间缩放：pointer 事件坐标（clientX/Y）与 getBoundingClientRect()
+  // 都在“视觉空间”V = 布局空间 L × zoom；而 style.left/top、offsetWidth、innerWidth、
+  // 100vw 等是布局空间 L。游戏内所有碰撞/拖拽都在 L 空间计算，因此：
+  //   evX/evY 把指针坐标从 V 换算到 L（除以 curZoom）；
+  //   rectL   把 getBoundingClientRect 从 V 换算到 L（每个字段除以 curZoom）。
+  function evX(e) { return e.clientX / curZoom; }
+  function evY(e) { return e.clientY / curZoom; }
+  function rectL(el) {
+    const r = el.getBoundingClientRect();
+    const z = curZoom;
+    return { left: r.left / z, top: r.top / z, right: r.right / z, bottom: r.bottom / z, width: r.width / z, height: r.height / z };
+  }
+  // 旋转后窗口长宽互换，坐标空间变化：重新按新空间摆放当前题目。
+  function relayoutAfterRotate() {
+    const prev = curZoom;
+    fitZoom();
+    if (currentCards.length && curZoom !== prev) resetBoard();
+  }
   window.addEventListener('resize', fitZoom);
-  window.addEventListener('orientationchange', fitZoom);
+  window.addEventListener('orientationchange', () => {
+    relayoutAfterRotate();
+  });
+  // 首次加载时窗口尺寸可能尚未确定：load 后再算一次，
+  // 并推迟到下一帧，确保首帧就按实际窗口缩放（否则小窗口启动会一直是 1）。
+  window.addEventListener('load', () => {
+    fitZoom();
+    requestAnimationFrame(fitZoom);
+  });
   fitZoom();
+  if (document.readyState === 'complete') {
+    requestAnimationFrame(fitZoom);
+  }
 
   let currentCards = [];
   let currentTarget = 24;
@@ -988,16 +1020,16 @@
     return out;
   }
   function moveRects() {
-    const ar = areaEl.getBoundingClientRect();
+    const ar = rectL(areaEl);
     let rects = [{ left: 0, top: 0, right: ar.width, bottom: ar.height }];
     BAR_ELS().forEach((el) => {
       if (!el) return;
-      const r = el.getBoundingClientRect();
+      const r = rectL(el);
       rects = subtractRect(rects, { left: r.left - ar.left, top: r.top - ar.top, right: r.right - ar.left, bottom: r.bottom - ar.top });
     });
     const dockEl = document.getElementById('opDock');
     if (dockEl && dockEl.children.length) {
-      const r = dockEl.getBoundingClientRect();
+      const r = rectL(dockEl);
       const pad = 12;
       rects = subtractRect(rects, { left: r.left - ar.left - pad, top: r.top - ar.top - pad, right: r.right - ar.left + pad, bottom: r.bottom - ar.top + pad });
     }
@@ -1032,16 +1064,16 @@
 
   // 所有 UI 禁区（白框 + 算式框 + dock），坐标相对 game-area
   function uiRects() {
-    const ar = areaEl.getBoundingClientRect();
+    const ar = rectL(areaEl);
     const uis = [];
     BAR_ELS().forEach((el) => {
       if (!el) return;
-      const r = el.getBoundingClientRect();
+      const r = rectL(el);
       uis.push({ left: r.left - ar.left, top: r.top - ar.top, right: r.right - ar.left, bottom: r.bottom - ar.top });
     });
     const dockEl = document.getElementById('opDock');
     if (dockEl && dockEl.children.length) {
-      const r = dockEl.getBoundingClientRect();
+      const r = rectL(dockEl);
       const pad = 12;
       uis.push({ left: r.left - ar.left - pad, top: r.top - ar.top - pad, right: r.right - ar.left + pad, bottom: r.bottom - ar.top + pad });
     }
@@ -1054,7 +1086,7 @@
     let x = dx, y = dy;
     const hw = w / 2, hh = h / 2;
     // 屏幕/游戏区上下左右边界：滑块整体不超出 game-area
-    const ar = areaEl.getBoundingClientRect();
+    const ar = rectL(areaEl);
     x = Math.max(hw, Math.min(x, ar.width - hw));
     y = Math.max(hh, Math.min(y, ar.height - hh));
     const uis = uiRects();
@@ -1087,12 +1119,12 @@
 
   // 中央可用矩形（用于初始摆放）
   function moveBounds() {
-    const ar = areaEl.getBoundingClientRect();
+    const ar = rectL(areaEl);
     return {
-      left: (leftBarEl ? leftBarEl.getBoundingClientRect().right : ar.left) - ar.left,
-      top: (topBarEl ? topBarEl.getBoundingClientRect().bottom : ar.top) - ar.top,
-      right: (rightBarEl ? rightBarEl.getBoundingClientRect().left : ar.right) - ar.left,
-      bottom: (bottomBarEl ? bottomBarEl.getBoundingClientRect().top : ar.bottom) - ar.top
+      left: (leftBarEl ? rectL(leftBarEl).right : ar.left) - ar.left,
+      top: (topBarEl ? rectL(topBarEl).bottom : ar.top) - ar.top,
+      right: (rightBarEl ? rectL(rightBarEl).left : ar.right) - ar.left,
+      bottom: (bottomBarEl ? rectL(bottomBarEl).top : ar.bottom) - ar.top
     };
   }
 
@@ -1575,8 +1607,11 @@
     won = false;
     const mb = moveBounds();
     const numY = mb.top + Math.round((mb.bottom - mb.top) * 0.24);
+    // 数字固定靠在屏幕左边一列排开，间距自适应避免溢出
+    const availW = (mb.right - mb.left) - 24;
+    const spacing = Math.min(130, availW / 4);
     currentCards.forEach((n, i) => {
-      nums.push({ id: 'n' + (numSeq++), n, d: 1, isResult: false, slotRef: null, x: mb.left + 20 + i * 130, y: numY, w: 1 });
+      nums.push({ id: 'n' + (numSeq++), n, d: 1, isResult: false, slotRef: null, x: mb.left + 12 + i * spacing, y: numY, w: 1 });
     });
     poolCounts = opCountMap();
     renderDock();
@@ -1619,8 +1654,6 @@
   function renderDock() {
     const dock = document.getElementById('opDock');
     dock.innerHTML = '';
-    const mb = moveBounds();
-    dock.style.top = (mb.bottom - 60) + 'px';
     const order = useEasyOps() ? ['+', '-', '*', '/'] : SYMBOL_ORDER;
     order.forEach((sym) => {
       const n = poolCounts[sym] || 0;
@@ -1650,20 +1683,6 @@
       bindDock(el, sym);
       dock.appendChild(el);
     });
-
-    // 居中放置，但让开左下角按钮组
-    const cbEl = document.getElementById('cornerBtns');
-    let cx = (mb.left + mb.right) / 2;
-    if (cbEl) {
-      const cbR = cbEl.getBoundingClientRect();
-      const ar = areaEl.getBoundingClientRect();
-      const cbRight = cbR.right - ar.left;
-      const dockW = dock.offsetWidth;
-      const minCx = cbRight + 20 + dockW / 2;
-      if (cx < minCx) cx = minCx;
-      cx = Math.min(cx, mb.right - dockW / 2 - 10);
-    }
-    dock.style.left = cx + 'px';
   }
 
   function spawnOp(sym) {
@@ -1696,7 +1715,7 @@
   // 拖拽生成：不重建 dock，仅新建 op 元素跟随指针
   function spawnOpAt(sym, cx, cy) {
     if ((poolCounts[sym] || 0) <= 0) return null;
-    const ar = areaEl.getBoundingClientRect();
+    const ar = rectL(areaEl);
     const x = cx - ar.left;
     const y = cy - ar.top;
     poolCounts[sym]--;
@@ -1728,29 +1747,30 @@
     el.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       if ((poolCounts[sym] || 0) <= 0) return;
-      state = { active: true, moved: false, opId: null, sx: e.clientX, sy: e.clientY };
+      state = { active: true, moved: false, opId: null, sx: evX(e), sy: evY(e) };
       el.setPointerCapture(e.pointerId);
     });
 
     el.addEventListener('pointermove', (e) => {
       if (!state.active) return;
-      const dx = e.clientX - state.sx;
-      const dy = e.clientY - state.sy;
+      const ex = evX(e), ey = evY(e);
+      const dx = ex - state.sx;
+      const dy = ey - state.sy;
       if (!state.moved && Math.hypot(dx, dy) < 6) return;
       if (!state.moved) {
         state.moved = true;
-        const o = spawnOpAt(sym, e.clientX, e.clientY);
+        const o = spawnOpAt(sym, ex, ey);
         if (!o) { state.active = false; return; }
         state.opId = o.id;
       }
       const o = ops.find((x) => x.id === state.opId);
       if (!o) return;
-      const ar = areaEl.getBoundingClientRect();
+      const ar = rectL(areaEl);
       const oel = document.querySelector('.op[data-id="' + o.id + '"]');
-      const or = oel ? oel.getBoundingClientRect() : { width: 96, height: 64 };
+      const or = oel ? rectL(oel) : { width: 96, height: 64 };
       const hw = or.width / 2, hh = or.height / 2;
-      o.x = Math.max(hw, Math.min(e.clientX - ar.left, ar.width - hw));
-      o.y = Math.max(hh, Math.min(e.clientY - ar.top, ar.height - hh));
+      o.x = Math.max(hw, Math.min(ex - ar.left, ar.width - hw));
+      o.y = Math.max(hh, Math.min(ey - ar.top, ar.height - hh));
       if (oel) {
         oel.style.left = o.x + 'px';
         oel.style.top = o.y + 'px';
@@ -1877,16 +1897,16 @@
       el.classList.remove('sucking');
       el.classList.remove('sucking-out');
       el.style.transform = '';
-      const r = el.getBoundingClientRect();
-      const base = el.parentElement ? el.parentElement.getBoundingClientRect() : { left: 0, top: 0 };
+      const r = rectL(el);
+      const base = el.parentElement ? rectL(el.parentElement) : { left: 0, top: 0 };
       state.base = base;
       const isOp = data.id && data.id.charAt(0) === 'o';
       if (isOp) {
-        state.offX = e.clientX - (r.left + r.width / 2);
-        state.offY = e.clientY - (r.top + r.height / 2);
+        state.offX = evX(e) - (r.left + r.width / 2);
+        state.offY = evY(e) - (r.top + r.height / 2);
       } else {
-        state.offX = e.clientX - r.left;
-        state.offY = e.clientY - r.top;
+        state.offX = evX(e) - r.left;
+        state.offY = evY(e) - r.top;
       }
       state.active = true;
       state.moved = false;
@@ -1903,9 +1923,9 @@
           el.style.width = '';
           el.style.minWidth = '';
           el.style.height = slabSize() + 'px';
-          state.base = areaEl.getBoundingClientRect(); // 元素已移到 game-area，坐标基准同步切换
-          data.x = e.clientX - state.offX - state.base.left;
-          data.y = e.clientY - state.offY - state.base.top;
+          state.base = rectL(areaEl); // 元素已移到 game-area，坐标基准同步切换
+          data.x = evX(e) - state.offX - state.base.left;
+          data.y = evY(e) - state.offY - state.base.top;
           const half = slabSize() / 2;
           const p = placeRect(data.x + half, data.y + half, slabSize(), slabSize(), moveRects());
           data.x = p.x - half; data.y = p.y - half;
@@ -1919,12 +1939,12 @@
     el.addEventListener('pointermove', (e) => {
       if (!state.active) return;
       state.moved = true;
-      const r = el.getBoundingClientRect();
+      const r = rectL(el);
       const isOp = data.id && data.id.charAt(0) === 'o';
       const curX = isOp ? data.x : data.x + r.width / 2;
       const curY = isOp ? data.y : data.y + r.height / 2;
-      let x = e.clientX - state.offX - state.base.left;
-      let y = e.clientY - state.offY - state.base.top;
+      let x = evX(e) - state.offX - state.base.left;
+      let y = evY(e) - state.offY - state.base.top;
 
       if (isOp) {
         const targetX = x, targetY = y;
@@ -2023,9 +2043,9 @@
       if (slotEl.querySelector('.num')) return;
       const o = ops.find((o) => o.id === slotEl.dataset.opId);
       if (!o || o.resultId) return;
-      const sr = slotEl.getBoundingClientRect();
+      const sr = rectL(slotEl);
       const cx = sr.left + sr.width / 2, cy = sr.top + sr.height / 2;
-      const ar = areaEl.getBoundingClientRect();
+      const ar = rectL(areaEl);
       const dist = Math.hypot((ar.left + x + r.width / 2) - cx, (ar.top + y + r.height / 2) - cy);
       if (dist < bestDist) { bestDist = dist; best = { opId: o.id, side: slotEl.dataset.side }; }
     });
@@ -2212,8 +2232,8 @@
   function nearDock(cx, cy) {
     const dockEl = document.getElementById('opDock');
     if (!dockEl || !dockEl.children.length) return false;
-    const r = dockEl.getBoundingClientRect();
-    const ar = areaEl.getBoundingClientRect();
+    const r = rectL(dockEl);
+    const ar = rectL(areaEl);
     const dl = r.left - ar.left, dr = r.right - ar.left;
     const dt = r.top - ar.top, db = r.bottom - ar.top;
     const pad = 56;
@@ -2239,8 +2259,8 @@
   function dockSlotCenter(sym) {
     const el = document.querySelector('.op-fixed[data-sym="' + sym + '"]');
     if (!el) return null;
-    const ar = areaEl.getBoundingClientRect();
-    const r = el.getBoundingClientRect();
+    const ar = rectL(areaEl);
+    const r = rectL(el);
     return { x: r.left + r.width / 2 - ar.left, y: r.top + r.height / 2 - ar.top };
   }
   function popDock(sym) {
@@ -2325,7 +2345,7 @@
         setTimeout(() => p.remove(), 1400);
       }
     };
-    const r = areaEl.getBoundingClientRect();
+    const r = rectL(areaEl);
     burst(r.left + r.width * 0.5, r.top + r.height * 0.4);
     setTimeout(() => burst(r.left + r.width * 0.3, r.top + r.height * 0.3), 150);
     setTimeout(() => burst(r.left + r.width * 0.7, r.top + r.height * 0.3), 320);
@@ -2735,17 +2755,18 @@ const RULE_KEYS = ['easy', 'normal', 'hard', 'hell'];
       let target = document.querySelector(s.targetSel);
       if (!target && s.targetSel === '.op') target = document.getElementById('opDock');
       if (target) {
-        const r = target.getBoundingClientRect();
+        const r = rectL(target);
         hole.style.left = (r.left - 10) + 'px';
         hole.style.top = (r.top - 10) + 'px';
         hole.style.width = (r.width + 20) + 'px';
         hole.style.height = (r.height + 20) + 'px';
         const cw = 300;
         let cx = r.left + r.width / 2 - cw / 2;
-        cx = Math.max(8, Math.min(window.innerWidth - cw - 8, cx));
+        const mw = rectL(modal).width; // 模态框为 fixed inset:0，其 L 空间尺寸 = 布局视口
+        cx = Math.max(8, Math.min(mw - cw - 8, cx));
         card.style.left = cx + 'px';
         card.style.top = (r.bottom + 20) + 'px';
-        if (r.bottom + 200 > window.innerHeight) {
+        if (r.bottom + 200 > rectL(modal).height) {
           card.style.top = Math.max(8, r.top - 210) + 'px';
         }
       }
@@ -2857,7 +2878,6 @@ const RULE_KEYS = ['easy', 'normal', 'hard', 'hell'];
     showHome();
   });
 
-  newGame();
   applyLang();
   showHome();
 </script>
