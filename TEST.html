@@ -838,11 +838,25 @@
   // 视觉/布局空间换算见下方 rectL / evX / evY 说明。
   const DESIGN = 800;
   let curZoom = 1;
+  // 实测有效缩放比：某些内嵌浏览器（如 iOS 微信）的 getBoundingClientRect 不随根 zoom
+  // 缩放（直接返回布局 L 空间），而 clientX/Y 仍按 zoom 缩放（V 空间）。
+  // 用 areaEl 的 rect 宽 / offsetWidth 实测浏览器实际表现：
+  //   Chrome/Safari：rect 宽 = offsetWidth × zoom → effZ = zoom；
+  //   微信：rect 宽 = offsetWidth → effZ = 1（rect 本身已是 L）。
+  // rectL 按 effZ 换算；evX/evY 仍按 curZoom（clientX 在上述浏览器中均属 V 空间）。
+  let effZ = 1;
+  function computeEffZ() {
+    const el = document.getElementById('gameArea');
+    const r = el ? el.getBoundingClientRect() : null;
+    const w = el ? el.offsetWidth : 0;
+    effZ = (r && w > 0) ? r.width / w : curZoom;
+  }
   function fitZoom() {
     const w = window.outerWidth || window.screen.width;
     const h = window.outerHeight || window.screen.height;
     curZoom = Math.min(1, w / DESIGN, h / DESIGN);
     document.documentElement.style.zoom = curZoom;
+    computeEffZ();
   }
   // 根 zoom 会把视觉空间缩放：pointer 事件坐标（clientX/Y）与 getBoundingClientRect()
   // 都在“视觉空间”V = 布局空间 L × zoom；而 style.left/top、offsetWidth、innerWidth、
@@ -853,7 +867,7 @@
   function evY(e) { return e.clientY / curZoom; }
   function rectL(el) {
     const r = el.getBoundingClientRect();
-    const z = curZoom;
+    const z = effZ || curZoom;
     return { left: r.left / z, top: r.top / z, right: r.right / z, bottom: r.bottom / z, width: r.width / z, height: r.height / z };
   }
   // 旋转后窗口长宽互换，坐标空间变化：重新按新空间摆放当前题目。
@@ -1910,17 +1924,12 @@
       el.classList.remove('sucking');
       el.classList.remove('sucking-out');
       el.style.transform = '';
-      const r = rectL(el);
-      const base = el.parentElement ? rectL(el.parentElement) : { left: 0, top: 0 };
-      state.base = base;
-      const isOp = data.id && data.id.charAt(0) === 'o';
-      if (isOp) {
-        state.offX = evX(e) - (r.left + r.width / 2);
-        state.offY = evY(e) - (r.top + r.height / 2);
-      } else {
-        state.offX = evX(e) - r.left;
-        state.offY = evY(e) - r.top;
-      }
+      // 抓取偏移直接用逻辑坐标 data.x/data.y（与 style.left/top 同一 L 空间），
+      // 不依赖 getBoundingClientRect，避免微信等环境下 rect 与 clientX 缩放不一致
+      // 导致拖动跳偏。.num 的 data.x 是左上角、.op 的 data.x 是中心，二者统一。
+      state.offX = evX(e) - data.x;
+      state.offY = evY(e) - data.y;
+      state.base = { left: 0, top: 0 };
       state.active = true;
       state.moved = false;
 
