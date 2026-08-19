@@ -2,17 +2,29 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#667eea">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="format-detection" content="telephone=no">
 <title>24点游戏</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
+  button { touch-action: manipulation; }
   html, body { height: 100%; }
+  html { overscroll-behavior: none; }
   body {
     font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     overflow: hidden;
     display: flex;
     touch-action: none;
+    overscroll-behavior: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
   }
 
   /* ===== 中间列 ===== */
@@ -145,7 +157,7 @@
   .mode-menu {
     position: absolute;
     top: 0;
-    left: 10px;
+    left: calc(10px + env(safe-area-inset-left));
     z-index: 420;
     display: flex;
     flex-direction: column;
@@ -237,7 +249,7 @@
     width: fit-content;
     max-width: 100%;
     background: #fff;
-    padding: 10px 20px 12px;
+    padding: 10px 20px calc(12px + env(safe-area-inset-bottom));
     text-align: center;
     box-shadow: 0 -2px 12px rgba(0,0,0,0.15);
     border-radius: 14px 14px 0 0;
@@ -253,6 +265,7 @@
     color: #fff;
     transition: transform 0.1s, opacity 0.2s;
     min-width: 90px;
+    min-height: 44px;
   }
   .btn:hover { opacity: 0.9; }
   .btn:active { transform: scale(0.95); }
@@ -265,8 +278,8 @@
   /* ===== 左下角小按钮组（比滑块略小，滑块避让） ===== */
   .corner-btns {
     position: absolute;
-    left: 14px;
-    bottom: 14px;
+    left: calc(14px + env(safe-area-inset-left));
+    bottom: calc(14px + env(safe-area-inset-bottom));
     display: flex;
     gap: 10px;
     z-index: 740;
@@ -480,7 +493,7 @@
   /* ===== 固定运算符滑块（点击生成）===== */
   .op-dock {
     position: absolute;
-    right: 14px;
+    right: calc(14px + env(safe-area-inset-right));
     top: 50%;
     transform: translateY(-50%);
     display: flex;
@@ -909,7 +922,7 @@
       ansTitle: '参考答案',
       homeTitle: '主界面',
       langTitle: '语言',
-      setTitle: '设置',
+      setTitle: '全屏/退出全屏',
       langModalTitle: '选择语言',
       homeTitle: '终极24点',
       btnStart: '开始游戏',
@@ -962,7 +975,7 @@
       ansTitle: 'Reference Answer',
       homeTitle: 'Home',
       langTitle: 'Language',
-      setTitle: 'Settings',
+      setTitle: 'Fullscreen/Exit',
       langModalTitle: 'Language',
       homeTitle: 'Ultimate 24 points',
       btnStart: 'Start Game',
@@ -2843,6 +2856,36 @@ const RULE_KEYS = ['easy', 'normal', 'hard', 'hell'];
   document.querySelectorAll('.lang-opt').forEach((b) => {
     b.addEventListener('click', () => setLang(b.dataset.lang));
   });
+
+  // ===== 全屏切换（手机浏览器隐藏地址栏；iOS Safari 不支持则隐藏按钮） =====
+  function fullscreenSupported() {
+    return !!(document.documentElement.requestFullscreen ||
+      document.documentElement.webkitRequestFullscreen ||
+      document.documentElement.mozRequestFullScreen ||
+      document.documentElement.msRequestFullscreen);
+  }
+  const setBtn = document.getElementById('setBtn');
+  if (fullscreenSupported()) {
+    const toggleFullscreen = () => {
+      if (document.fullscreenElement || document.webkitFullscreenElement) {
+        (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      } else {
+        const el = document.documentElement;
+        (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
+      }
+    };
+    setBtn.addEventListener('click', toggleFullscreen);
+    document.addEventListener('fullscreenchange', () => {
+      fitZoom();
+      requestAnimationFrame(fitZoom);
+    });
+    document.addEventListener('webkitfullscreenchange', () => {
+      fitZoom();
+      requestAnimationFrame(fitZoom);
+    });
+  } else {
+    setBtn.style.display = 'none';
+  }
 
   // ===== 主界面 =====
   const homeScreen = document.getElementById('homeScreen');
